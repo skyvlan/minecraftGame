@@ -41,18 +41,25 @@ public class Input {
     camera.getVelocity().z = 0;
 
     // Process keyboard input for camera movement
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
       camera.moveForward((float) deltaTime);
-      System.out.println("X:" + camera.getPosition().x);
-      System.out.println("Y:" + camera.getPosition().y);
-      System.out.println("Z:" + camera.getPosition().z);
+      printPosition();
+    }
 
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
       camera.moveBackward((float) deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+      printPosition();
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
       camera.moveLeft((float) deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+      printPosition();
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
       camera.moveRight((float) deltaTime);
+      printPosition();
+    }
 
     // Jump with space bar
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !spacePressed) {
@@ -63,4 +70,11 @@ public class Input {
       spacePressed = false;
     }
   }
+
+  private void printPosition() {
+    System.out.println("X:" + camera.getPosition().x);
+    System.out.println("Y:" + camera.getPosition().y);
+    System.out.println("Z:" + camera.getPosition().z);
+  }
+
 }

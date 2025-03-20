@@ -18,7 +18,7 @@ public class Camera {
   public Camera(int width, int height) {
     this.width = width;
     this.height = height;
-    position = new Vector3f(0.0f, 2.0f, 0.0f);
+    position = new Vector3f(0.0f, 50.0f, 0.0f);
     velocity = new Vector3f(0.0f, 0.0f, 0.0f);
     front = new Vector3f(0.0f, 0.0f, -1.0f);
     up = new Vector3f(0.0f, 1.0f, 0.0f);

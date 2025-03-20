@@ -1,126 +1,121 @@
 package org.example;
 
-import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.lwjgl.system.MemoryStack;
-
-import java.nio.FloatBuffer;
-
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL30.*;
+import org.joml.Vector3i;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class World {
-  private int vaoId;
-  private int vboId;
-  private int vertexCount;
+  // Constants
+  public static final int AIR = 0;
+  public static final int GRASS = 1;
+  public static final int DIRT = 2;
+  public static final int STONE = 3;
+  public static final int CHUNK_SIZE = 16;
+  public static final int RENDER_DISTANCE = 4      ;
+
+  // Member variables
+  private final ConcurrentHashMap<ChunkPos, Chunk> chunks = new ConcurrentHashMap<>();
+  private final PerlinNoise noise;
+  private final ExecutorService chunkLoader;
+  private Vector3i lastPlayerChunk = new Vector3i(0, 0, 0);
 
   public World() {
-    // Initialize the world with a simple flat terrain
-    createTerrain();
+    // Use a fixed thread pool with fewer threads to prevent overwhelming the system
+    this.chunkLoader = Executors.newFixedThreadPool(2);
+    this.noise = new PerlinNoise(12345);
+
+    // Generate initial chunks synchronously to ensure they're available for rendering
+    generateInitialChunks();
   }
 
-  private void createTerrain() {
-    // Create a simple flat terrain of blocks
-    float[] vertices = {
-        // Positions             // Colors
-        // Bottom face
-        -0.5f, -0.5f, -0.5f,     0.5f, 0.5f, 0.5f,
-        0.5f, -0.5f, -0.5f,     0.5f, 0.5f, 0.5f,
-        0.5f, -0.5f,  0.5f,     0.5f, 0.5f, 0.5f,
-        0.5f, -0.5f,  0.5f,     0.5f, 0.5f, 0.5f,
-        -0.5f, -0.5f,  0.5f,     0.5f, 0.5f, 0.5f,
-        -0.5f, -0.5f, -0.5f,     0.5f, 0.5f, 0.5f,
-
-        // Top face
-        -0.5f,  0.5f, -0.5f,     0.0f, 1.0f, 0.0f,
-        0.5f,  0.5f, -0.5f,     0.0f, 1.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,     0.0f, 1.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,     0.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,     0.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,     0.0f, 1.0f, 0.0f,
-
-        // Front face
-        -0.5f, -0.5f,  0.5f,     0.8f, 0.6f, 0.4f,
-        0.5f, -0.5f,  0.5f,     0.8f, 0.6f, 0.4f,
-        0.5f,  0.5f,  0.5f,     0.8f, 0.6f, 0.4f,
-        0.5f,  0.5f,  0.5f,     0.8f, 0.6f, 0.4f,
-        -0.5f,  0.5f,  0.5f,     0.8f, 0.6f, 0.4f,
-        -0.5f, -0.5f,  0.5f,     0.8f, 0.6f, 0.4f,
-
-        // Back face
-        -0.5f, -0.5f, -0.5f,     0.8f, 0.6f, 0.4f,
-        0.5f, -0.5f, -0.5f,     0.8f, 0.6f, 0.4f,
-        0.5f,  0.5f, -0.5f,     0.8f, 0.6f, 0.4f,
-        0.5f,  0.5f, -0.5f,     0.8f, 0.6f, 0.4f,
-        -0.5f,  0.5f, -0.5f,     0.8f, 0.6f, 0.4f,
-        -0.5f, -0.5f, -0.5f,     0.8f, 0.6f, 0.4f,
-
-        // Left face
-        -0.5f, -0.5f, -0.5f,     0.6f, 0.6f, 0.6f,
-        -0.5f, -0.5f,  0.5f,     0.6f, 0.6f, 0.6f,
-        -0.5f,  0.5f,  0.5f,     0.6f, 0.6f, 0.6f,
-        -0.5f,  0.5f,  0.5f,     0.6f, 0.6f, 0.6f,
-        -0.5f,  0.5f, -0.5f,     0.6f, 0.6f, 0.6f,
-        -0.5f, -0.5f, -0.5f,     0.6f, 0.6f, 0.6f,
-
-        // Right face
-        0.5f, -0.5f, -0.5f,     0.6f, 0.6f, 0.6f,
-        0.5f, -0.5f,  0.5f,     0.6f, 0.6f, 0.6f,
-        0.5f,  0.5f,  0.5f,     0.6f, 0.6f, 0.6f,
-        0.5f,  0.5f,  0.5f,     0.6f, 0.6f, 0.6f,
-        0.5f,  0.5f, -0.5f,     0.6f, 0.6f, 0.6f,
-        0.5f, -0.5f, -0.5f,     0.6f, 0.6f, 0.6f
-    };
-
-    vertexCount = vertices.length / 6; // 6 elements per vertex (3 position, 3 color)
-
-    // Create and bind VAO
-    vaoId = glGenVertexArrays();
-    glBindVertexArray(vaoId);
-
-    // Create and bind VBO, and upload vertex data
-    vboId = glGenBuffers();
-    glBindBuffer(GL_ARRAY_BUFFER, vboId);
-    glBufferData(GL_ARRAY_BUFFER, vertices, GL_STATIC_DRAW);
-
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, false, 6 * Float.BYTES, 0);
-    glEnableVertexAttribArray(0);
-
-    // Color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, false, 6 * Float.BYTES, 3 * Float.BYTES);
-    glEnableVertexAttribArray(1);
-
-    // Unbind
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-  }
-
-  public void render() {
-    glBindVertexArray(vaoId);
-
-    // Draw multiple blocks to create a simple terrain
-    for (int x = -10; x <= 10; x++) {
-      for (int z = -10; z <= 10; z++) {
-        // Draw a block at (x, 0, z)
-        Matrix4f model = new Matrix4f().translate(x, 0, z);
-
-        // Get uniform location
-        int modelLoc = glGetUniformLocation(glGetInteger(GL_CURRENT_PROGRAM), "model");
-
-        // Upload matrix to shader
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-          FloatBuffer modelBuffer = stack.mallocFloat(16);
-          model.get(modelBuffer);
-          glUniformMatrix4fv(modelLoc, false, modelBuffer);
-        }
-
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+  private void generateInitialChunks() {
+    // Generate a smaller initial area to start faster
+    for (int x = -1; x <= 1; x++) {
+      for (int z = -1; z <= 1; z++) {
+        Chunk chunk = new Chunk(x, z, noise);
+        chunks.put(new ChunkPos(x, z), chunk);
       }
     }
+  }
 
-    glBindVertexArray(0);
+  public void updateChunks(Vector3f playerPosition) {
+    // Get the chunk the player is in
+    int playerChunkX = (int)Math.floor(playerPosition.x) >> 4;
+    int playerChunkZ = (int)Math.floor(playerPosition.z) >> 4;
+    Vector3i currentChunk = new Vector3i(playerChunkX, 0, playerChunkZ);
+
+    // Only update chunks if the player has moved to a different chunk
+    if (!currentChunk.equals(lastPlayerChunk)) {
+      lastPlayerChunk.set(currentChunk);
+
+      // Queue chunk generation for chunks in render distance
+      for (int x = playerChunkX - RENDER_DISTANCE; x <= playerChunkX + RENDER_DISTANCE; x++) {
+        for (int z = playerChunkZ - RENDER_DISTANCE; z <= playerChunkZ + RENDER_DISTANCE; z++) {
+          final ChunkPos pos = new ChunkPos(x, z);
+          if (!chunks.containsKey(pos)) {
+            chunkLoader.submit(() -> {
+              try {
+                Chunk chunk = new Chunk(pos.x, pos.z, noise);
+                chunks.put(pos, chunk);
+              } catch (Exception e) {
+                System.err.println("Error generating chunk at " + pos.x + "," + pos.z + ": " + e.getMessage());
+              }
+            });
+          }
+        }
+      }
+    }
+  }
+
+  public boolean isBlockAt(int x, int y, int z) {
+    if (y < 0 || y > 255) return false;
+
+    int chunkX = x >> 4;
+    int chunkZ = z >> 4;
+    ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+    Chunk chunk = chunks.get(pos);
+
+    if (chunk == null) return false;
+
+    // Convert to chunk-local coordinates
+    int localX = x & 0xF;
+    int localZ = z & 0xF;
+
+    return chunk.isBlockAt(localX, y, localZ);
+  }
+
+  public void render(Vector3f playerPosition) {
+    // Only render chunks within render distance
+    int playerChunkX = (int)Math.floor(playerPosition.x) >> 4;
+    int playerChunkZ = (int)Math.floor(playerPosition.z) >> 4;
+    System.out.println("Rendering chunks: " + chunks.size());
+    // Batch similar blocks together for fewer draw calls
+    Map<Integer, Integer> blockTypeCount = new HashMap<>();
+
+    for (int x = playerChunkX - RENDER_DISTANCE; x <= playerChunkX + RENDER_DISTANCE; x++) {
+      for (int z = playerChunkZ - RENDER_DISTANCE; z <= playerChunkZ + RENDER_DISTANCE; z++) {
+        Chunk chunk = chunks.get(new ChunkPos(x, z));
+        if (chunk != null) {
+          chunk.render(x, z, playerPosition, blockTypeCount);
+        }
+      }
+    }
+  }
+
+  public void cleanup() {
+    // Properly shut down the thread pool
+    chunkLoader.shutdown();
+    try {
+      if (!chunkLoader.awaitTermination(2, TimeUnit.SECONDS)) {
+        chunkLoader.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      chunkLoader.shutdownNow();
+    }
   }
 }

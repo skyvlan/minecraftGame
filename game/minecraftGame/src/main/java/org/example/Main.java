@@ -30,6 +30,15 @@ public class Main {
   private World world;
   private Physics physics;
 
+  private void cleanup() {
+    if (physics != null) {
+      physics.cleanup();
+    }
+
+    glDeleteProgram(shaderProgram);
+    glfwDestroyWindow(window);
+    glfwTerminate();
+  }
 
   public void run() {
     init();
@@ -48,6 +57,7 @@ public class Main {
     // Setup an error callback
     GLFWErrorCallback.createPrint(System.err).set();
     physics = new Physics();
+    world = physics.getWorld();
     // Initialize GLFW
     if (!glfwInit())
       throw new IllegalStateException("Unable to initialize GLFW");
@@ -105,7 +115,6 @@ public class Main {
 
     // Initialize game components
     camera = new Camera(width, height);
-    world = new World();
 
     // Setup shaders
     setupShaders();
@@ -208,7 +217,7 @@ public class Main {
       }
 
       // Render the world
-      world.render();
+      world.render(camera.getPosition());
 
       // Swap buffers and poll for window events
       glfwSwapBuffers(window);
